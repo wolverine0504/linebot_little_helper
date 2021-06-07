@@ -70,7 +70,7 @@ def callback():
 def handle_message(event):
     line_bot_api.reply_message(
         event.reply_token,
-        TextSendMessage(text="我是誰是臥底小幫手"))
+        TextSendMessage(text="我是誰是臥底小幫手，你好^_^"))
 
 
 if __name__ == "__main__":
