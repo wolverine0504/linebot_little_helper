@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-from random import sample
+from random import (sample, shuffle)
 from linebot import (LineBotApi, WebhookHandler)
 from linebot.exceptions import (InvalidSignatureError)
 from linebot.models import (
@@ -26,6 +26,7 @@ class Player:
         self.user_id = user_id
         self.identity = "civilian"
         self.signal = ""
+        self.isDie = False
     def setIdentity(self ,identity):
         self.identity = identity
     def setISignal(self ,signal):
@@ -39,25 +40,37 @@ class Room:
         self.players = []
         self.undercoverNum = 1
         self.undercovers = []
+        self.isStart = False
     def addPlayer(self, player):
         self.players.append(player)
     def showPlayers(self):
-        str = "已經加入的玩家:\n"
+        str = ""
         for player in self.players:
             str += player.name + '\n'
         return str
-    #分配身分
+    def setStart(self, isStart):
+        self.isStart = isStart
+    #遊戲開始時分配身分
     def setIdentities(self):
         self.undercovers = sample(self.players, self.undercoverNum)
         newSignal = Signal()
         for i in self.undercovers:
             i.setIdentity("undercover")
+        #打亂順序
+        shuffle(self.players)
         #分配暗號
         for i in self.players:
             if i.identity == "civilian":
                 i.setISignal(newSignal.civilian)
             else:
                 i.setISignal(newSignal.undercover)
+    #檢查房間內有無這人
+    def hasPlayer(self, user_id):
+        ret = False
+        for i in self.players:
+            if i.user_id == user_id:
+                ret = True
+        return ret
 
 #暗號
 class Signal:
@@ -115,38 +128,50 @@ def handle_message(event):
         roomIndex = findRoomIndex(groupid)
     profile = line_bot_api.get_profile(userid)
     userName = profile.display_name
-    
+    #尋求幫助
     if event.message.text == "!help":
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="我是誰是臥底小幫手\n創建房間請輸入\t!create\n加入房間請輸入\t!join\n確認房間玩家請輸入\t!checkplayers"))
-
+    #創建房間
     if event.message.text == "!create":
         newRoom = Room(groupid)
         rooms.append(newRoom)
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="已創建新房間\n要加入房間前請先把小幫手加入好友\n加入房間請輸入 !join"))
-
+    #加入房間
     if event.message.text == "!join":
-        newPlayer = Player(userName, userid)
-        rooms[roomIndex].addPlayer(newPlayer)
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=userName + "已加入房間\n要開始遊戲請輸入 !start"))
-        line_bot_api.push_message(userid, TextSendMessage(text="你已經成功加入房間\n請等待遊戲開始"))
-
+        if rooms[roomIndex].isStart == True:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text = userName + "遊戲已經開始囉\n請等待下一局開始"))
+        elif rooms[roomIndex].hasPlayer(userid) == True:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text = userName + "你原本就在房間內囉\n要開始遊戲請輸入 !start"))
+        else:
+            newPlayer = Player(userName, userid)
+            rooms[roomIndex].addPlayer(newPlayer)
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text = userName + "已加入房間\n要開始遊戲請輸入 !start"))
+            line_bot_api.push_message(userid, TextSendMessage(text="你已經成功加入房間\n請等待遊戲開始"))
+    #查詢房間玩家
     if event.message.text == "!checkplayers":
-        reply = rooms[roomIndex].showPlayers()
+        reply = "已經加入的玩家:\n" + rooms[roomIndex].showPlayers()
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=reply))
-    
-    if event.message.text == "!start":
+    #開始遊戲
+    if event.message.text == "!start" and rooms[roomIndex].isStart == False:
+        rooms[roomIndex].setStart(True)
         rooms[roomIndex].setIdentities()
+        reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" 
+        + rooms[roomIndex].showPlayers() + "描述完畢請輸入 !vote開始投票"
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="遊戲已經開始\n已經將暗號私訊給每個人囉~"))
+            TextSendMessage(text = reply))
         for player in rooms[roomIndex].players:
             line_bot_api.push_message(player.user_id, TextSendMessage(text="遊戲已經開始\n你拿到的暗號是: "+ player.signal))
 
