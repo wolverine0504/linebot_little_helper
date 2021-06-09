@@ -12,6 +12,11 @@ from linebot.models import (
     QuickReply,
     QuickReplyButton,
     MessageAction,
+    TemplateSendMessage,
+    ButtonsTemplate,
+    MessageTemplateAction,
+    PostbackEvent,
+    PostbackTemplateAction,
     PostbackAction, ImagemapSendMessage, ImageSendMessage, StickerSendMessage, AudioSendMessage, LocationSendMessage,
     FlexSendMessage, VideoSendMessage,
 )
@@ -40,7 +45,8 @@ class Room:
         self.players = []
         self.undercoverNum = 1
         self.undercovers = []
-        self.isStart = False
+        self.survives = []
+        self.state = 1      # 1:創建房間 2:遊戲開始 3:開始投票 4:公布投票結果
     def addPlayer(self, player):
         self.players.append(player)
     def showPlayers(self):
@@ -48,8 +54,8 @@ class Room:
         for player in self.players:
             str += player.name + '\n'
         return str
-    def setStart(self, isStart):
-        self.isStart = isStart
+    def setState(self, state):
+        self.state = state
     #遊戲開始時分配身分
     def setIdentities(self):
         self.undercovers = sample(self.players, self.undercoverNum)
@@ -71,6 +77,12 @@ class Room:
             if i.user_id == user_id:
                 ret = True
         return ret
+    #檢查活人
+    def findSurvive(self):
+        self.survives.clear()
+        for i in self.players:
+            if i.isDie == False:
+                self.survives.append(i)
 
 #暗號
 class Signal:
@@ -116,7 +128,6 @@ def callback():
     except InvalidSignatureError:
         print("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
-
     return 'OK'
 
 #輸入文字時觸發的event
@@ -126,8 +137,11 @@ def handle_message(event):
     if event.source.type == "group":
         groupid = event.source.group_id
         roomIndex = findRoomIndex(groupid)
+        if roomIndex != -1:
+            room = rooms[roomIndex]
     profile = line_bot_api.get_profile(userid)
     userName = profile.display_name
+    
     #尋求幫助
     if event.message.text == "!help":
         line_bot_api.reply_message(
@@ -142,38 +156,66 @@ def handle_message(event):
             TextSendMessage(text="已創建新房間\n要加入房間前請先把小幫手加入好友\n加入房間請輸入 !join"))
     #加入房間
     if event.message.text == "!join":
-        if rooms[roomIndex].isStart == True:
+        if room.state != 1:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text = userName + "遊戲已經開始囉\n請等待下一局開始"))
-        elif rooms[roomIndex].hasPlayer(userid) == True:
+                TextSendMessage(text = userName + "遊戲早就開始囉\n請等待下一局開始"))
+        elif room.hasPlayer(userid) == True:
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text = userName + "你原本就在房間內囉\n要開始遊戲請輸入 !start"))
         else:
             newPlayer = Player(userName, userid)
-            rooms[roomIndex].addPlayer(newPlayer)
+            room.addPlayer(newPlayer)
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text = userName + "已加入房間\n要開始遊戲請輸入 !start"))
             line_bot_api.push_message(userid, TextSendMessage(text="你已經成功加入房間\n請等待遊戲開始"))
     #查詢房間玩家
     if event.message.text == "!checkplayers":
-        reply = "已經加入的玩家:\n" + rooms[roomIndex].showPlayers()
+        reply = "已經加入的玩家:\n" + room.showPlayers()
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=reply))
     #開始遊戲
-    if event.message.text == "!start" and rooms[roomIndex].isStart == False:
-        rooms[roomIndex].setStart(True)
-        rooms[roomIndex].setIdentities()
-        reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" 
-        + rooms[roomIndex].showPlayers() + "描述完畢請輸入 !vote開始投票"
+    if event.message.text == "!start":
+        if room.state != 1:
+            line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text = "遊戲早就開始囉"))
+        else:
+            room.setState(2)
+            room.setIdentities()
+            reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers() + "描述完畢請輸入 !vote開始投票"
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text = reply))
+            for player in room.players:
+                line_bot_api.push_message(player.user_id, TextSendMessage(text="遊戲已經開始\n你拿到的暗號是: "+ player.signal+"\n請到群組輪流描述你拿到的暗號"))
+    #投票階段
+    if event.message.text == "!vote":
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text = reply))
-        for player in rooms[roomIndex].players:
-            line_bot_api.push_message(player.user_id, TextSendMessage(text="遊戲已經開始\n你拿到的暗號是: "+ player.signal))
+            TextSendMessage(text = "進入投票階段\n請各位到私訊窗選出最可疑的嫌疑犯"))
+        room.findSurvive()
+        options = []
+        for i in room.survives:
+            options.append(MessageTemplateAction(
+                label=i.name,
+                text=i.name
+           )
+        )
+        for i in room.survives:
+            buttons_template = TemplateSendMessage(
+                alt_text='Buttons Template',
+                template=ButtonsTemplate(
+                    title='投票',
+                    text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
+                    actions=options
+                )
+            )
+            line_bot_api.push_message(i.user_id, buttons_template)
+
 
 #找到房間的index
 def findRoomIndex(group_id):
@@ -182,6 +224,14 @@ def findRoomIndex(group_id):
         if room.room_id == group_id:
             roomIndex = i
     return roomIndex
+
+#找到私訊的玩家在哪一間room
+def findWhichRoom(user_id):
+    for i, room in enumerate(rooms):
+        for player in room:
+            if player.user_id == user_id:
+                return i
+    return -1
 
 #邀請至群組時觸發的event
 @handler.add(JoinEvent)
