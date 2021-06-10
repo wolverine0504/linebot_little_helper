@@ -24,6 +24,8 @@ from linebot.models.events import JoinEvent, PostbackEvent,MemberJoinedEvent,Mem
 
 import os
 
+from requests import NullHandler
+
 #儲存加入玩家的資料
 class Player:
     def __init__(self, name, user_id):
@@ -32,6 +34,7 @@ class Player:
         self.identity = "civilian"
         self.signal = ""
         self.isDie = False
+        self.voteNum = 0
     def setIdentity(self ,identity):
         self.identity = identity
     def setISignal(self ,signal):
@@ -46,12 +49,20 @@ class Room:
         self.undercoverNum = 1
         self.undercovers = []
         self.survives = []
+        self.surviveUndercover = 0
+        self.surviveCivilian = 0
         self.state = 1      # 1:創建房間 2:遊戲開始 3:開始投票 4:公布投票結果
+        self.isVote = 0
     def addPlayer(self, player):
         self.players.append(player)
     def showPlayers(self):
         str = ""
         for player in self.players:
+            str += player.name + '\n'
+        return str
+    def showSurvives(self):
+        str = ""
+        for player in self.survives:
             str += player.name + '\n'
         return str
     def setState(self, state):
@@ -83,6 +94,13 @@ class Room:
         for i in self.players:
             if i.isDie == False:
                 self.survives.append(i)
+        self.surviveCivilian = 0
+        self.surviveUndercover = 0
+        for i in self.survives:
+            if i.identity == "civilian":
+                self.surviveCivilian += 1
+            else:
+                self.surviveUndercover += 1
 
 #暗號
 class Signal:
@@ -200,21 +218,60 @@ def handle_message(event):
         room.findSurvive()
         options = []
         for i in room.survives:
-            options.append(MessageTemplateAction(
-                label=i.name,
-                text=i.name
+            options.append(PostbackTemplateAction(
+                label = i.name,
+                text =  i.name,
+                data = "vote" + i.user_id
            )
         )
         for i in room.survives:
             buttons_template = TemplateSendMessage(
-                alt_text='Buttons Template',
-                template=ButtonsTemplate(
-                    title='投票',
-                    text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
-                    actions=options
+                alt_text = 'Buttons Template',
+                template = ButtonsTemplate(
+                    title = '投票',
+                    text = "以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
+                    actions = options
                 )
             )
             line_bot_api.push_message(i.user_id, buttons_template)
+
+#處理私訊的投票
+@handler.add(PostbackEvent)
+def handle_postback(event):
+     if event.postback.data[0:4] == "vote":
+        user_id = event.postback.data[4:]
+        print(event.postback.data + "\n" + user_id)
+        candidate = findWhichPlayer(user_id)
+        candidate.voteNum += 1
+        room = rooms[findWhichRoom(user_id)]
+        room.isVote += 1
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text = "你投給了" + candidate.name + "\n請稍等其他玩家"))
+        #結算投票
+        if room.isVote >= len(room.survives):
+            for player in room.survives:
+                line_bot_api.push_message(player.user_id, TextSendMessage(text="所有人都已投票完畢\n請至群組察看結果"))
+            reply = "公布投票結果:\n"
+            highestPlayer = candidate
+            for player in room.survives:
+                reply += player.name + str(player.voteNum) + "票\n"
+                if player.voteNum > highestPlayer.voteNum:
+                    highestPlayer = player
+            line_bot_api.push_message(room.room_id, TextSendMessage(text=reply + "最高票為" + highestPlayer.name + "\n大家決定處決掉他"))
+            highestPlayer.isDie = True
+            room.findSurvive()
+            #判斷遊戲勝負
+            if room.surviveUndercover == 0:
+                line_bot_api.push_message(room.room_id, TextSendMessage(text="平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) + "人\n平民獲勝\n遊戲結束"))
+                rooms.remove(room)            
+            elif room.surviveCivilian <= room.surviveUndercover:
+                line_bot_api.push_message(room.room_id, TextSendMessage(text="平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) + "人\n臥底獲勝\n遊戲結束"))
+                rooms.remove(room)
+            else:
+                line_bot_api.push_message(room.room_id, TextSendMessage(text="平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) + "人\n遊戲繼續"))
+                line_bot_api.push_message(room.room_id, TextSendMessage(text="請按照以下順序描述你拿到的暗號:\n" + str(room.showSurvives())  + "描述完畢請輸入 !vote開始投票"))
+                    
 
 
 #找到房間的index
@@ -225,10 +282,18 @@ def findRoomIndex(group_id):
             roomIndex = i
     return roomIndex
 
-#找到私訊的玩家在哪一間room
+#根據user_id找到玩家是誰
+def findWhichPlayer(user_id):
+    for room in rooms:
+        for player in room.players:
+            if player.user_id == user_id:
+                return player
+    return -1
+
+#根據user_id找到玩家在哪一間room
 def findWhichRoom(user_id):
     for i, room in enumerate(rooms):
-        for player in room:
+        for player in room.players:
             if player.user_id == user_id:
                 return i
     return -1
