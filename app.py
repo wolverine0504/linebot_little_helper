@@ -133,7 +133,7 @@ class Signal:
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(
-    '9O+AksBSYI25k10gJJtUVYcjDP7iwMJJ3X3jR1EuHu+niilcg2au5zGjMNgHyZdkOcY3ANDsPBmDs0Qh+hz3aNxIbgRvAyoaHqXoJsRgVmF0T3gARAJoD6nxIZLCxcis8+pfGNv30fqiNMFox8UeugdB04t89/1O/w1cDnyilFU=')
+    '3dl/t0sL0uKA2/vt0fACm5FgMnP6Ba4bVE89258SDraqlkq355fff824TVW3WvIHVSEYCWbhv6A38oNcOue/R8u2orOreInHietxvPlg3SzjbQIbK/osq3xQc4QHLDI0hHXaV5NcWSWHR/wXeCOpSwdB04t89/1O/w1cDnyilFU=')
 handler = WebhookHandler('e0a84cc10df79cb10c1e93d7fbddcf9b')
 rooms = []
 
@@ -203,7 +203,7 @@ def handle_message(event):
     # 創建房間
     if event.message.text == "!create":
         try:
-            if findRoomIndex(groupid)!=-1:
+            if findRoomIndex(groupid) != -1:
                 raise
             newRoom = Room(groupid)
             rooms.append(newRoom)
@@ -216,14 +216,14 @@ def handle_message(event):
                         MessageTemplateAction(
                             label="加入房間",
                             text="!join"
-                            ),
+                        ),
                         MessageTemplateAction(
                             label="解散房間",
                             text="!disband"
-                            )
-                        ]
-                    )
+                        )
+                    ]
                 )
+            )
             line_bot_api.reply_message(
                 event.reply_token,
                 buttons_template)
@@ -236,10 +236,10 @@ def handle_message(event):
                         MessageTemplateAction(
                             label="解散房間",
                             text="!disband"
-                            )
-                        ]
-                    )
+                        )
+                    ]
                 )
+            )
             line_bot_api.reply_message(
                 event.reply_token,
                 buttons_template)
@@ -289,7 +289,7 @@ def handle_message(event):
                 room.room_id,
                 TextSendMessage(text="房間不存在"))
 
-    #解散房間
+    # 解散房間
     if event.message.text == "!disband":
         try:
             rooms.remove(room)
@@ -301,18 +301,17 @@ def handle_message(event):
                 event.reply_token,
                 TextSendMessage(text="房間不存在"))
 
-    #退出房間
+    # 退出房間
     if event.message.text == "!leave":
         try:
             room.players.remove(findWhichPlayer(userid))
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text= (userName + "已離開房間")))
+                TextSendMessage(text=(userName + "已離開房間")))
         except:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text= (userName + "尚未加入房間")))
-            
+                TextSendMessage(text=(userName + "尚未加入房間")))
 
     # 查詢房間玩家
     if event.message.text == "!checkplayers":
@@ -328,25 +327,27 @@ def handle_message(event):
 
     # 開始遊戲
     if event.message.text == "!start":
-        #try:
+        # try:
         if room.state != 1:
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text="遊戲早就開始囉"))
-        elif len(room.players)<1:
+        elif len(room.players) < 1:
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text="至少需要4個人才能開始遊戲喔"))
         else:
             room.setState(2)
             # 調整臥底數
-            room.undercoverNum=1#len(room.players)/4
+            room.undercoverNum = 1  # len(room.players)/4
             room.setIdentities()
-            reply = "遊戲開始\nThere's "+str(room.undercoverNum)+" spy among us\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
+            reply = "遊戲開始\nThere's " + \
+                str(room.undercoverNum) + \
+                " spy among us\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text=reply))
-        
+
             buttons_template = TemplateSendMessage(
                 alt_text='Buttons Template',
                 template=ButtonsTemplate(
@@ -417,8 +418,8 @@ def handle_message(event):
                         title='投票',
                         text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
                         actions=options
-                        )
                     )
+                )
                 line_bot_api.push_message(i.user_id, buttons_template)
         except:
             line_bot_api.reply_message(
@@ -446,7 +447,7 @@ def handle_postback(event):
                 line_bot_api.push_message(
                     player.user_id, TextSendMessage(text="所有人都已投票完畢\n請至群組察看結果"))
             reply = "公布投票結果:\n"
-            highestPlayer = candidate#Player("userName", 0)
+            highestPlayer = candidate  # Player("userName", 0)
             isEqual = False
             for player in room.survives:
                 reply += player.name + str(player.voteNum) + "票\n"
@@ -456,34 +457,39 @@ def handle_postback(event):
                 elif player.voteNum == highestPlayer.voteNum:
                     isEqual = True
             if isEqual == False:
-                reply += ("最高票為: " + highestPlayer.name + "\n大家決定處決掉他\n" + highestPlayer.name + "的身分是: ")
+                reply += ("最高票為: " + highestPlayer.name +
+                          "\n大家決定處決掉他\n" + highestPlayer.name + "的身分是: ")
                 if highestPlayer.identity == "civilian":
                     reply += "平民"
                 else:
                     reply += "臥底"
-                line_bot_api.push_message(room.room_id, TextSendMessage(text = reply))
+                line_bot_api.push_message(
+                    room.room_id, TextSendMessage(text=reply))
                 #highestPlayer.isDie = True
             else:
-                line_bot_api.push_message(room.room_id, TextSendMessage(text = "有相同票數\n這輪沒人被處決"))
+                line_bot_api.push_message(
+                    room.room_id, TextSendMessage(text="有相同票數\n這輪沒人被處決"))
             room.findSurvive()
             # 判斷遊戲勝負
             if room.surviveUndercover == 0:
-                reply = "平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) +"人\n平民獲勝\n遊戲結束\n"
+                reply = "平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + \
+                    str(room.surviveUndercover) + "人\n平民獲勝\n遊戲結束\n"
                 for player in room.survives:
-                        if player.identity == "civilian":
-                            reply += player.name + " 平民\n"
-                        else:
-                            reply += player.name + " 臥底\n"
+                    if player.identity == "civilian":
+                        reply += player.name + " 平民\n"
+                    else:
+                        reply += player.name + " 臥底\n"
                 line_bot_api.push_message(room.room_id, TextSendMessage(
                     text=reply))
                 rooms.remove(room)
             elif room.surviveCivilian <= room.surviveUndercover:
-                reply = "平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) +"人\n臥底獲勝\n遊戲結束\n"
+                reply = "平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + \
+                    str(room.surviveUndercover) + "人\n臥底獲勝\n遊戲結束\n"
                 for player in room.survives:
-                        if player.identity == "civilian":
-                            reply += player.name + "是平民\n"
-                        else:
-                            reply += player.name + "是臥底\n"
+                    if player.identity == "civilian":
+                        reply += player.name + "是平民\n"
+                    else:
+                        reply += player.name + "是臥底\n"
                 line_bot_api.push_message(room.room_id, TextSendMessage(
                     text=reply))
                 rooms.remove(room)
@@ -510,6 +516,8 @@ def handle_postback(event):
                     buttons_template)
 
 # 找到房間的index
+
+
 def findRoomIndex(group_id):
     roomIndex = -1
     for i, room in enumerate(rooms):
@@ -518,6 +526,8 @@ def findRoomIndex(group_id):
     return roomIndex
 
 # 根據user_id找到玩家是誰
+
+
 def findWhichPlayer(user_id):
     for room in rooms:
         for player in room.players:
@@ -526,6 +536,8 @@ def findWhichPlayer(user_id):
     return -1
 
 # 根據user_id找到玩家在哪一間room
+
+
 def findWhichRoom(user_id):
     for i, room in enumerate(rooms):
         for player in room.players:
@@ -534,6 +546,8 @@ def findWhichRoom(user_id):
     return -1
 
 # 邀請至群組時觸發的event
+
+
 @handler.add(JoinEvent)
 def handle_join(event):
     newcoming_text = "我是誰是臥底小幫手\n謝謝邀請我來此群組！\n想得到幫助請輸入!help"
@@ -543,6 +557,8 @@ def handle_join(event):
     )
 
 # 加入好友時觸發的event
+
+
 @handler.add(FollowEvent)
 def handle_follow(event):
     newcoming_text = "我是誰是臥底小幫手\n謝謝把我加入好友！\n想得到幫助請輸入!help"
