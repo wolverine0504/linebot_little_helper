@@ -194,30 +194,53 @@ def handle_message(event):
             event.reply_token,
             TextSendMessage(text="我是誰是臥底小幫手\n創建房間請輸入\t!create\n加入房間請輸入\t!join\n確認房間玩家請輸入\t!checkplayers"))
 
-    # 創建房間
-    if event.message.text == "!create":
-        newRoom = Room(groupid)
-        rooms.append(newRoom)
-        buttons_template = TemplateSendMessage(
-            alt_text='Buttons Template',
-            template=ButtonsTemplate(
-                title='已創建新房間',
-                text="想參與遊戲前請先把小幫手加入好友\n加入好友後請按「加入房間」",
-                actions=[
-                    MessageTemplateAction(
-                        label="加入房間",
-                        text="!join"
-                    ),
-                    MessageTemplateAction(
-                        label="解散房間",
-                        text="!disband"
-                    )
-                ]
-            )
-        )
+    # 遊戲規則
+    if event.message.text == "!rule":
         line_bot_api.reply_message(
             event.reply_token,
-            buttons_template)
+            TextSendMessage(text="誰是臥底規則\n"))
+
+    # 創建房間
+    if event.message.text == "!create":
+        try:
+            newRoom = Room(groupid)
+            rooms.append(newRoom)
+            buttons_template = TemplateSendMessage(
+                alt_text='Buttons Template',
+                template=ButtonsTemplate(
+                    title='已創建新房間',
+                    text="想參與遊戲前請先把小幫手加入好友\n加入好友後請按「加入房間」",
+                    actions=[
+                        MessageTemplateAction(
+                            label="加入房間",
+                            text="!join"
+                            ),
+                        MessageTemplateAction(
+                            label="解散房間",
+                            text="!disband"
+                            )
+                        ]
+                    )
+                )
+            line_bot_api.reply_message(
+                event.reply_token,
+                buttons_template)
+        except:
+            buttons_template = TemplateSendMessage(
+                alt_text='Buttons Template',
+                template=ButtonsTemplate(
+                    text="目前已有房間進行遊戲中\n若要重新開始請先解散房間",
+                    actions=[
+                        MessageTemplateAction(
+                            label="解散房間",
+                            text="!disband"
+                            )
+                        ]
+                    )
+                )
+            line_bot_api.reply_message(
+                event.reply_token,
+                buttons_template)
 
     # 加入房間
     if event.message.text == "!join":
@@ -261,84 +284,131 @@ def handle_message(event):
 
     #解散房間
     if event.message.text == "!disband":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="房間已解散"))
-        rooms.remove(room)
+        try:
+            rooms.remove(room)
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="房間已解散"))
+        except:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="房間不存在"))
 
     #退出房間
     if event.message.text == "!leave":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text= (userName + "已離開房間")))
-        room.players.remove(findWhichPlayer(userid))
+        try:
+            room.players.remove(findWhichPlayer(userid))
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text= (userName + "已離開房間")))
+        except:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text= (userName + "尚未加入房間")))
+            
 
     # 查詢房間玩家
     if event.message.text == "!checkplayers":
-        reply = "已經加入的玩家:\n" + room.showPlayers()
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=reply))
-
-    # 開始遊戲
-    if event.message.text == "!start":
-        if room.state != 1:
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text="遊戲早就開始囉"))
-        else:
-            room.setState(2)
-            room.setIdentities()
-            reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
+        try:
+            reply = "已經加入的玩家:\n" + room.showPlayers()
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text=reply))
+        except:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="房間不存在"))
+
+    # 開始遊戲
+    if event.message.text == "!start":
+        try:
+            if room.state != 1:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="遊戲早就開始囉"))
+            else:
+                room.setState(2)
+                room.setIdentities()
+                reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=reply))
             
+                buttons_template = TemplateSendMessage(
+                    alt_text='Buttons Template',
+                    template=ButtonsTemplate(
+                        title='投票',
+                        text="描述完畢請按「開始投票」",
+                        actions=[
+                            MessageTemplateAction(
+                                label="開始投票",
+                                text="!vote"
+                            )
+                        ]
+                    )
+                )
+                line_bot_api.push_message(
+                    room.room_id,
+                    buttons_template)
+
+                for player in room.players:
+                    line_bot_api.push_message(player.user_id, TextSendMessage(
+                        text="遊戲已經開始\n你拿到的暗號是: " + player.signal+"\n請到群組輪流描述你拿到的暗號"))
+        except:
             buttons_template = TemplateSendMessage(
                 alt_text='Buttons Template',
                 template=ButtonsTemplate(
-                    title='投票',
-                    text="描述完畢請按「開始投票」",
+                    title='房間不存在',
+                    text="請先創建房間",
                     actions=[
                         MessageTemplateAction(
-                            label="開始投票",
-                            text="!vote"
-                        )
-                    ]
+                            label="創建房間",
+                            text="!create"
+                            ),
+                        MessageTemplateAction(
+                            label="閱讀規則",
+                            text="!rule"
+                            )
+                        ]
+                    )
                 )
-            )
-            line_bot_api.push_message(
-                room.room_id,
+            line_bot_api.reply_message(
+                event.reply_token,
                 buttons_template)
-
-            for player in room.players:
-                line_bot_api.push_message(player.user_id, TextSendMessage(
-                    text="遊戲已經開始\n你拿到的暗號是: " + player.signal+"\n請到群組輪流描述你拿到的暗號"))
 
     # 投票階段
     if event.message.text == "!vote":
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="進入投票階段\n請各位到私訊窗選出最可疑的嫌疑犯"))
-        room.findSurvive()
-        options = []
-        for i in room.survives:
-            options.append(PostbackTemplateAction(
-                label=i.name,
-                text=i.name,
-                data="vote" + i.user_id
-            )
-            )
-        for i in room.survives:
-            buttons_template = TemplateSendMessage(
-                alt_text='Buttons Template',
-                template=ButtonsTemplate(
-                    title='投票',
-                    text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
-                    actions=options
+        try:
+            if room.state != 2:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=userName + "現在不是投票時間喔\n請稍安勿躁"))
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="進入投票階段\n請各位到私訊窗選出最可疑的嫌疑犯"))
+            room.findSurvive()
+            options = []
+            for i in room.survives:
+                options.append(PostbackTemplateAction(
+                    label=i.name,
+                    text=i.name,
+                    data="vote" + i.user_id
                 )
-            )
+                )
+            for i in room.survives:
+                buttons_template = TemplateSendMessage(
+                    alt_text='Buttons Template',
+                    template=ButtonsTemplate(
+                        title='投票',
+                        text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
+                        actions=options
+                        )
+                    )
             line_bot_api.push_message(i.user_id, buttons_template)
+        except:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="房間不存在"))
 
 # 處理私訊的投票
 
