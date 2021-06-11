@@ -203,6 +203,8 @@ def handle_message(event):
     # 創建房間
     if event.message.text == "!create":
         try:
+            if findRoomIndex(groupid)!=-1:
+                raise
             newRoom = Room(groupid)
             rooms.append(newRoom)
             buttons_template = TemplateSendMessage(
@@ -244,43 +246,48 @@ def handle_message(event):
 
     # 加入房間
     if event.message.text == "!join":
-        if room.state != 1:
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=userName + "遊戲早就開始囉\n請等待下一局開始"))
-        elif room.hasPlayer(userid) == True:
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=userName + "你原本就在房間內囉"))
-        else:
-            newPlayer = Player(userName, userid)
-            room.addPlayer(newPlayer)
-            buttons_template = TemplateSendMessage(
-                alt_text='Buttons Template',
-                template=ButtonsTemplate(
-                    title=userName + "已加入房間",
-                    text="所有玩家準備就緒時請按「開始遊戲」\n想離開房間請按「退出房間」",
-                    actions=[
-                        MessageTemplateAction(
-                            label="開始遊戲",
-                            text="!start"
-                        ),
-                        MessageTemplateAction(
-                            label="退出房間",
-                            text="!leave"
-                        ),
-                        MessageTemplateAction(
-                            label="查看房間玩家",
-                            text="!checkplayers"
-                        )
-                    ]
+        try:
+            if room.state != 1:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=userName + "遊戲早就開始囉\n請等待下一局開始"))
+            elif room.hasPlayer(userid) == True:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=userName + "你原本就在房間內囉"))
+            else:
+                newPlayer = Player(userName, userid)
+                room.addPlayer(newPlayer)
+                buttons_template = TemplateSendMessage(
+                    alt_text='Buttons Template',
+                    template=ButtonsTemplate(
+                        title=userName + "已加入房間",
+                        text="所有玩家準備就緒時請按「開始遊戲」\n想離開房間請按「退出房間」",
+                        actions=[
+                            MessageTemplateAction(
+                                label="開始遊戲",
+                                text="!start"
+                            ),
+                            MessageTemplateAction(
+                                label="退出房間",
+                                text="!leave"
+                            ),
+                            MessageTemplateAction(
+                                label="查看房間玩家",
+                                text="!checkplayers"
+                            )
+                        ]
+                    )
                 )
-            )
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    buttons_template)
+                line_bot_api.push_message(
+                    userid, TextSendMessage(text="你已經成功加入房間\n請等待遊戲開始"))
+        except:
             line_bot_api.reply_message(
                 event.reply_token,
-                buttons_template)
-            line_bot_api.push_message(
-                userid, TextSendMessage(text="你已經成功加入房間\n請等待遊戲開始"))
+                TextSendMessage(text="房間不存在"))
 
     #解散房間
     if event.message.text == "!disband":
@@ -326,10 +333,16 @@ def handle_message(event):
                 line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text="遊戲早就開始囉"))
+            elif len(room.players)<4:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="至少需要4個人才能開始遊戲喔"))
             else:
                 room.setState(2)
+                # 調整臥底數
+                room.undercoverNum=len(room.players)/4
                 room.setIdentities()
-                reply = "遊戲已經開始\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
+                reply = "遊戲開始\nThere's "+room.undercoverNum+" spy among us\n已經將暗號私訊給每個人囉~\n請按照以下順序描述你拿到的暗號:\n" + room.showPlayers()
                 line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(text=reply))
@@ -474,7 +487,6 @@ def handle_postback(event):
                 line_bot_api.push_message(
                     room.room_id,
                     buttons_template)
-
 
 # 找到房間的index
 def findRoomIndex(group_id):
