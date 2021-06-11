@@ -387,7 +387,23 @@ def handle_postback(event):
                 line_bot_api.push_message(room.room_id, TextSendMessage(
                     text="平民尚餘" + str(room.surviveCivilian) + "人\n臥底尚餘" + str(room.surviveUndercover) + "人\n遊戲繼續"))
                 line_bot_api.push_message(room.room_id, TextSendMessage(
-                    text="請按照以下順序描述你拿到的暗號:\n" + str(room.showSurvives()) + "描述完畢請輸入 !vote開始投票"))
+                    text="請按照以下順序描述你拿到的暗號:\n" + str(room.showSurvives())))
+                buttons_template = TemplateSendMessage(
+                    alt_text='Buttons Template',
+                    template=ButtonsTemplate(
+                        title='投票',
+                        text="描述完畢請按「開始投票」",
+                        actions=[
+                            MessageTemplateAction(
+                                label="開始投票",
+                                text="!vote"
+                            )
+                        ]
+                    )
+                )
+                line_bot_api.push_message(
+                    room.room_id,
+                    buttons_template)
 
 
 # 找到房間的index
