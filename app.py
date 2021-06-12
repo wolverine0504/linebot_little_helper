@@ -198,7 +198,7 @@ def handle_message(event):
     if event.message.text == "!rule":
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="誰是臥底規則\n"))
+            TextSendMessage(text="誰是臥底:\n遊戲開始後，每個人都會收到一個詞\n平民的詞都是相同的\n而臥底會拿到與平民不一樣的詞\n每個人輪流描述自己的詞的特徵\n一輪過後，投票處決一個人\n重複數輪討論->處決->討論->處決\n如果臥底全部陣亡:平民勝利\n如果存活的臥底數量等於平民:臥底勝利\n\n特別注意:描述時一定要跟自己的詞相符\n平民拿到核桃，臥底拿到榴槤\n臥底說:他是堅果(犯規)\n臥底說:他有硬殼(合格)"))
 
     # 創建房間
     if event.message.text == "!create":
