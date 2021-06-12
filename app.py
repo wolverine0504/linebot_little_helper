@@ -465,7 +465,7 @@ def handle_postback(event):
                     reply += "臥底"
                 line_bot_api.push_message(
                     room.room_id, TextSendMessage(text=reply))
-                #highestPlayer.isDie = True
+                highestPlayer.isDie = True
             else:
                 line_bot_api.push_message(
                     room.room_id, TextSendMessage(text="有相同票數\n這輪沒人被處決"))
