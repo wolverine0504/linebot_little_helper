@@ -133,7 +133,7 @@ class Signal:
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(
-    '3dl/t0sL0uKA2/vt0fACm5FgMnP6Ba4bVE89258SDraqlkq355fff824TVW3WvIHVSEYCWbhv6A38oNcOue/R8u2orOreInHietxvPlg3SzjbQIbK/osq3xQc4QHLDI0hHXaV5NcWSWHR/wXeCOpSwdB04t89/1O/w1cDnyilFU=')
+    'X3wueyVB727lOfmNELLvY8ZQN7xCvlmXFJoLESxNIzaCa3e/7hJ1o7MgnSJ8zh2fOcY3ANDsPBmDs0Qh+hz3aNxIbgRvAyoaHqXoJsRgVmGLw/7xUZgcDQ/f6qfhaV3KSs4efJg+vSwhaT2XzqNo9wdB04t89/1O/w1cDnyilFU=')
 handler = WebhookHandler('e0a84cc10df79cb10c1e93d7fbddcf9b')
 rooms = []
 
