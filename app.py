@@ -413,6 +413,7 @@ def handle_message(event):
             room.findSurvive()
             for player in room.survives:
                 player.voteNum = 0
+            room.isVote == 0
             options = []
             for i in room.survives:
                 options.append(
