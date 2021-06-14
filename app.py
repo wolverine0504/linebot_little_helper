@@ -2,6 +2,7 @@ from flask import Flask, request, abort
 from random import (sample, shuffle)
 from linebot import (LineBotApi, WebhookHandler)
 from linebot.exceptions import (InvalidSignatureError)
+from linebot.models import *
 from linebot.models import (
     FollowEvent,
     JoinEvent,
@@ -130,14 +131,6 @@ class Signal:
         self.undercover = single_row['under_cover'].values[0]
 
 
-app = Flask(__name__)
-
-line_bot_api = LineBotApi(
-    'X3wueyVB727lOfmNELLvY8ZQN7xCvlmXFJoLESxNIzaCa3e/7hJ1o7MgnSJ8zh2fOcY3ANDsPBmDs0Qh+hz3aNxIbgRvAyoaHqXoJsRgVmGLw/7xUZgcDQ/f6qfhaV3KSs4efJg+vSwhaT2XzqNo9wdB04t89/1O/w1cDnyilFU=')
-handler = WebhookHandler('e0a84cc10df79cb10c1e93d7fbddcf9b')
-rooms = []
-
-
 def getMessageObject(jsonObject):
     message_type = jsonObject.get('type')
     if message_type == 'text':
@@ -159,6 +152,14 @@ def getMessageObject(jsonObject):
     elif message_type == 'video':
         return VideoSendMessage.new_from_json_dict(jsonObject)
 
+
+app = Flask(__name__)
+
+line_bot_api = LineBotApi(
+    'wK++jG9VZOP61OrCijw3Ece13dfeH1WczXloTDiRCj7vloCbqmoqqteWH0DjjpPw1YAtP9BJNLT/hqNerPfB0G0z+WCQ0dfbJ/2TTUqCMDabYRxZFPt3uPLiQxpywt6/TVP89iV+eBw/RCeH2H5AOQdB04t89/1O/w1cDnyilFU=')
+handler = WebhookHandler('a776d4c9c4433610af62563113c6cc0e')
+rooms = []
+
 # 接收 LINE 的資訊
 
 
@@ -167,6 +168,7 @@ def callback():
     signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
+
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
@@ -187,6 +189,14 @@ def handle_message(event):
             room = rooms[roomIndex]
     profile = line_bot_api.get_profile(userid)
     userName = profile.display_name
+
+    # 傳選項圖
+    if event.message.text == "選項":
+        imagemap_msg = getMessageObject(imagemap)
+        line_bot_api.reply_message(
+            event.reply_token,
+            imagemap_msg
+        )
 
     # 尋求幫助
     if event.message.text == "!help":
@@ -405,22 +415,16 @@ def handle_message(event):
                 player.voteNum = 0
             options = []
             for i in room.survives:
-                options.append(PostbackTemplateAction(
-                    label=i.name,
-                    text=i.name,
-                    data="vote" + i.user_id
-                )
-                )
+                options.append(
+                    QuickReplyButton(action=PostbackAction(
+                        label=i.name,
+                        text=i.name,
+                        data="vote" + i.user_id
+                    )))
             for i in room.survives:
-                buttons_template = TemplateSendMessage(
-                    alt_text='Buttons Template',
-                    template=ButtonsTemplate(
-                        title='投票',
-                        text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯",
-                        actions=options
-                    )
-                )
-                line_bot_api.push_message(i.user_id, buttons_template)
+                text_quickReply_button = TextSendMessage(
+                    text="以下是目前還存活的玩家\n請選出可疑的嫌疑犯", quick_reply=QuickReply(options))
+                line_bot_api.push_message(i.user_id, text_quickReply_button)
         except:
             line_bot_api.reply_message(
                 event.reply_token,
@@ -548,12 +552,56 @@ def findWhichRoom(user_id):
 # 邀請至群組時觸發的event
 
 
+imagemap = {
+    "type": "imagemap",
+    "baseUrl": "https://i.imgur.com/SVoFUwi.png",
+    "altText": "This is an imagemap",
+    "baseSize": {
+        "width": 1040,
+        "height": 479
+    },
+    "actions": [
+        {
+            "type": "message",
+            "area": {
+                "x": 3,
+                "y": 7,
+                "width": 349,
+                "height": 458
+            },
+            "text": "!rule"
+        },
+        {
+            "type": "message",
+            "area": {
+                "x": 359,
+                "y": 10,
+                "width": 341,
+                "height": 451
+            },
+            "text": "!create"
+        },
+        {
+            "type": "message",
+            "area": {
+                "x": 712,
+                "y": 14,
+                "width": 325,
+                "height": 445
+            },
+            "text": "!disband"
+        }
+    ]
+}
+
+
 @handler.add(JoinEvent)
 def handle_join(event):
     newcoming_text = "我是誰是臥底小幫手\n謝謝邀請我來此群組！\n想得到幫助請輸入!help"
+    imagemap_msg = getMessageObject(imagemap)
     line_bot_api.reply_message(
         event.reply_token,
-        TextMessage(text=newcoming_text)
+        [TextMessage(text=newcoming_text), imagemap_msg]
     )
 
 # 加入好友時觸發的event
@@ -561,10 +609,11 @@ def handle_join(event):
 
 @handler.add(FollowEvent)
 def handle_follow(event):
-    newcoming_text = "我是誰是臥底小幫手\n謝謝把我加入好友！\n想得到幫助請輸入!help"
+    newcoming_text = "我是誰是臥底小幫手\n謝謝邀請我來此群組！\n想得到幫助請輸入!help"
+    imagemap_msg = getMessageObject(imagemap)
     line_bot_api.reply_message(
         event.reply_token,
-        TextMessage(text=newcoming_text)
+        [TextMessage(text=newcoming_text), imagemap_msg]
     )
 
 
